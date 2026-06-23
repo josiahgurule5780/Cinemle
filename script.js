@@ -2,82 +2,72 @@
 const API_KEY = "a24cbba3b16a5ea825ec42ac4e4c8d52"; 
 let SECRET_MOVIE = null;
 let dailyMoviePool = []; 
-let CURRENT_DATE_SEED = 0;
 let GAME_MODE = "daily"; 
 
-const searchInput = document.getElementById("movie-search");
-const feed = document.getElementById("guesses-feed");
-const victoryPanel = document.getElementById("victory-reveal-panel");
+// Use DOMContentLoaded to ensure elements exist before attaching listeners
+document.addEventListener('DOMContentLoaded', () => {
+    initGame();
+    setupSearchListeners();
+});
 
 async function initGame() {
-    setupModeToggleButtons();
     try {
-        // Fetch data from TMDB
         const res = await fetch(`https://api.themoviedb.org/3/discover/movie?api_key=${API_KEY}&language=en-US&sort_by=popularity.desc&vote_count.gte=50&page=1`);
-        if (!res.ok) throw new Error("API response not okay");
         const data = await res.json();
-        
         dailyMoviePool = data.results || [];
         
         if (dailyMoviePool.length > 0) {
             await startMatch();
-        } else {
-            updateHintText("No movies found in pool.");
         }
     } catch (err) {
-        console.error("Initialization Error:", err);
-        updateHintText("Failed to load game data. Check Console.");
+        console.error("Init Error:", err);
     }
 }
 
-async function setDailyMovie() {
-    const today = new Date();
-    CURRENT_DATE_SEED = today.getUTCFullYear() * 10000 + (today.getUTCMonth() + 1) * 100 + today.getUTCDate();
-    const targetIndex = CURRENT_DATE_SEED % dailyMoviePool.length;
-    await loadTargetDetails(dailyMoviePool[targetIndex].id);
+function setupSearchListeners() {
+    const searchInput = document.getElementById("movie-search");
+    const dropdown = document.getElementById("dropdown-results");
+
+    if (!searchInput) return;
+
+    // Use 'input' instead of 'keyup' for better mobile support
+    searchInput.addEventListener('input', (e) => {
+        const query = e.target.value.toLowerCase();
+        if (query.length > 1) {
+            showDropdown(query);
+        } else {
+            dropdown.style.display = 'none';
+        }
+    });
 }
 
-function setupModeToggleButtons() {
-    const btnDaily = document.getElementById("btn-mode-daily");
-    const btnEndless = document.getElementById("btn-mode-endless");
-    if (!btnDaily || !btnEndless) return;
+function showDropdown(query) {
+    const dropdown = document.getElementById("dropdown-results");
+    dropdown.innerHTML = ""; // Clear old results
+    
+    const matches = dailyMoviePool.filter(m => m.title.toLowerCase().includes(query));
+    
+    matches.forEach(movie => {
+        const div = document.createElement("div");
+        div.innerText = movie.title;
+        div.className = "dropdown-item";
+        div.onclick = () => selectMovie(movie); // Ensure selection logic is bound here
+        dropdown.appendChild(div);
+    });
+    
+    dropdown.style.display = matches.length > 0 ? 'block' : 'none';
+}
 
-    btnDaily.onclick = async () => { GAME_MODE = "daily"; await startMatch(); };
-    btnEndless.onclick = async () => { GAME_MODE = "endless"; await startMatch(); };
+function selectMovie(movie) {
+    console.log("Selected:", movie.title);
+    document.getElementById("dropdown-results").style.display = 'none';
+    document.getElementById("movie-search").value = movie.title;
+    // Trigger your guess submission logic here
 }
 
 async function startMatch() {
-    if (feed) feed.innerHTML = "";
-    if (victoryPanel) victoryPanel.style.display = "none";
-    if (searchInput) searchInput.value = "";
-
-    if (GAME_MODE === "daily") {
-        await setDailyMovie();
-    } else {
-        const randomIndex = Math.floor(Math.random() * dailyMoviePool.length);
-        await loadTargetDetails(dailyMoviePool[randomIndex].id);
-    }
+    // Reset UI state
+    document.getElementById("guesses-feed").innerHTML = "";
+    // Logic to select movie based on mo
+    de...
 }
-
-async function loadTargetDetails(movieId) {
-    try {
-        const res = await fetch(`https://api.themoviedb.org/3/movie/${movieId}?api_key=${API_KEY}&append_to_response=credits`);
-        const details = await res.json();
-        SECRET_MOVIE = {
-            id: details.id,
-            title: details.title.toUpperCase(),
-            year: parseInt(details.release_date?.split("-")[0]) || 0,
-            genre: details.genres?.[0]?.name || "Unknown"
-        };
-        updateHintText(`Daily Hint: A popular ${SECRET_MOVIE.genre} movie released in ${SECRET_MOVIE.year}.`);
-    } catch (err) {
-        console.error("Detail Fetch Error:", err);
-    }
-}
-
-function updateHintText(text) {
-    const hintElement = document.getElementById("hint-text");
-    if (hintElement) hintElement.innerText = text;
-}
-
-window.addEventListener('DOMContentLoaded', initGame);
