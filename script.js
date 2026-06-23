@@ -51,36 +51,17 @@ async function setDailyMovie() {
     const directorObj = details.credits?.crew?.find(member => member.job === "Director");
     const mainGenre = details.genres?.length > 0 ? details.genres[0].name : "Unknown";
 
-    // Clean up the text: hide the title, character names, or major keywords
-    let cleanHint = details.overview || "No hint available.";
-    
-    // Hide the title if it appears in the description
-    cleanHint = cleanHint.replace(new RegExp(details.title, 'gi'), "[THE MOVIE]");
-    
-    // Hide obvious dead-giveaway Marvel/Character names if they show up
-    cleanHint = cleanHint.replace(/Tony Stark|Ultron|Avengers|Thor|Iron Man|Captain America|Peter Parker|Batman|Joker|Super/gi, "[CENSOR]");
-
-    // Chop the description down cleanly to the first sentence or two (stops at the first period after 80 characters)
-    if (cleanHint.length > 120) {
-        let endOfSentence = cleanHint.indexOf('.', 80);
-        if (endOfSentence !== -1) {
-            cleanHint = cleanHint.substring(0, endOfSentence + 1);
-        } else {
-            cleanHint = cleanHint.substring(0, 120) + "...";
-        }
-    }
-
     SECRET_MOVIE = {
         id: details.id,
         title: details.title.toUpperCase(),
         year: parseInt(details.release_date?.split("-")[0]) || 0,
         genre: mainGenre,
         director: directorObj ? directorObj.name : "Unknown",
-        hint: details.tagline || cleanHint, // Uses the short tagline first if it exists!
         poster: details.poster_path ? `https://image.tmdb.org/t/p/w200${details.poster_path}` : ""
     };
 
-    document.getElementById("hint-text").innerText = `Daily Hint: "${SECRET_MOVIE.hint}"`;
+    // MAKE THE HINT EXTREMELY BROAD (No plot description at all!)
+    document.getElementById("hint-text").innerText = `Daily Hint: A popular ${SECRET_MOVIE.genre} movie released in ${SECRET_MOVIE.year}.`;
 }
 
 // 4. Live Search Input Autocomplete filtering real API data
