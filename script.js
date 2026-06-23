@@ -1,5 +1,6 @@
 // 1. Setup API configuration and Daily State Variables
 const API_KEY = "a24cbba3b16a5ea825ec42ac4e4c8d52"; 
+const APP_VERSION = "5.0"; // bump this string when you deploy a new update
 let SECRET_MOVIE = null;
 let dailyMoviePool = []; 
 let CURRENT_DATE_SEED = 0;
@@ -12,8 +13,48 @@ const dropdown = document.getElementById("dropdown-results");
 const feed = document.getElementById("guesses-feed");
 const victoryPanel = document.getElementById("victory-reveal-panel");
 
+// Utility: compute the date seed used by the game (YYYYMMDD integer)
+function getDateSeed(date = new Date()) {
+    return date.getUTCFullYear() * 10000 + (date.getUTCMonth() + 1) * 100 + date.getUTCDate();
+}
+
+// Clears localStorage keys that belong to the app when the day changes or the app version changes.
+function clearCacheIfNewDayOrVersion() {
+    try {
+        const todaySeed = String(getDateSeed());
+        const storedSeed = localStorage.getItem('moviedle_date_seed');
+        const storedVersion = localStorage.getItem('moviedle_app_version');
+
+        const needsClear = (storedSeed !== todaySeed) || (storedVersion !== APP_VERSION);
+        if (!needsClear) return;
+
+        // Collect keys to remove (support both naming variants: movidle_ and moviedle_)
+        const keysToRemove = [];
+        for (let i = 0; i < localStorage.length; i++) {
+            const key = localStorage.key(i);
+            if (!key) continue;
+            if (/^mov(idle|iedle)/.test(key)) {
+                keysToRemove.push(key);
+            }
+        }
+
+        keysToRemove.forEach(k => localStorage.removeItem(k));
+
+        // Store the new seed and app version so we don't clear again during the same day/version
+        localStorage.setItem('moviedle_date_seed', todaySeed);
+        localStorage.setItem('moviedle_app_version', APP_VERSION);
+
+        console.log('[Movidle] Cleared cache for new day or updated app version:', todaySeed, APP_VERSION);
+    } catch (e) {
+        console.error('Failed to clear cache safely:', e);
+    }
+}
+
 // 2. Fetch a global list of movies safely for the Daily Target Picker
 async function initGame() {
+    // ensure cache is reset when appropriate (daily or when app was updated)
+    clearCacheIfNewDayOrVersion();
+
     setupModeToggleButtons();
     try {
         let moviePromises = [];
@@ -155,7 +196,7 @@ function launchDevPanel() {
 
     let overlay = document.createElement("div");
     overlay.id = "admin-dev-overlay";
-    overlay.style = "position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(15,15,20,0.98); z-index:9999; color:#fff; font-family:sans-serif; padding:30px; box-sizing:border-box; overflow-y:auto;";
+    overlay.style = "position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(15,15,20,0.98); z-index:9999; color:#fff; font-family:sans-serif; padding:30px; box-sizing:border-box; overflow:auto;";
 
     let title = document.createElement("h2");
     title.innerText = "🛠️ SYSTEM DEVELOPER CONTROL PANEL";
@@ -262,7 +303,7 @@ function launchDevPanel() {
                     row.innerHTML = `
                         <span><strong>${m.title} (${yr})</strong> - ID: ${m.id}</span>
                         <div>
-                            <button class="dev-set-tgt" data-id="${m.id}" style="background:#e53e3e; color:#fff; border:none; padding:4px 8px; font-size:11px; border-radius:3px; cursor:pointer; margin-right:5px;">Set Target</button>
+                            <button class="dev-set-tgt" data-id="${m.id}" style="background:#e53e3e; color:#fff; border:none; padding:4px 8px; font-size:11px; border-radius:3px; cursor:pointer; margin-right:6px;">Set Target</button>
                             <button class="dev-inj-guess" data-id="${m.id}" style="background:#4ade80; color:#000; border:none; padding:4px 8px; font-size:11px; border-radius:3px; cursor:pointer;">Inject Guess</button>
                         </div>
                     `;
@@ -296,7 +337,7 @@ function launchDevPanel() {
             <span>Genre:</span><input type="text" id="rig-genre" style="padding:6px; background:#2d3748; border:1px solid #4a5568; color:#fff; border-radius:4px;">
             <span>Director:</span><input type="text" id="rig-director" style="padding:6px; background:#2d3748; border:1px solid #4a5568; color:#fff; border-radius:4px;">
         </div>
-        <button id="btn-rig-apply" style="width:100%; margin-top:10px; padding:8px; background:#d69e2e; color:#fff; border:none; border-radius:4px; font-weight:bold; cursor:pointer;">Apply Attribute Rig overrides</button>
+        <button id="btn-rig-apply" style="width:100%; margin-top:10px; padding:8px; background:#d69e2e; color:#fff; border:none; border-radius:4px; font-weight:bold; cursor:pointer;">Apply Attribute Rigs</button>
     `;
     overlay.appendChild(rigBlock);
 
@@ -394,7 +435,7 @@ function refreshInfoBox(box) {
     `;
 }
 function styleDevButton(btn, bgColor) {
-    btn.style = `display:block; width:100%; background:${bgColor}; color:#fff; border:none; padding:12px; margin:5px 0; font-size:14px; font-weight:bold; border-radius:6px; cursor:pointer; text-align:left;`;
+    btn.style = `display:block; width:100%; background:${bgColor}; color:#fff; border:none; padding:12px; margin:5px 0; font-size:14px; font-weight:bold; border-radius:6px; cursor:pointer; text-align:center;`;
 }
 function bknStyle(b) { b.style.flex = "1"; b.style.textAlign = "center"; }
 
@@ -402,3 +443,10 @@ function bknStyle(b) { b.style.flex = "1"; b.style.textAlign = "center"; }
 function showCustomGameModal(titleText, bodyText) {
     if (document.getElementById("custom-game-modal-overlay")) return;
     
+    // (modal implementation continues...)
+}
+
+// Start the game when the script loads
+window.addEventListener('DOMContentLoaded', () => {
+    initGame();
+});
