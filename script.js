@@ -535,4 +535,62 @@ async function loadSavedGuesses(currentDateSeed) {
     }
 }
 
-initGame();
+    card.innerHTML = `
+        <h2 style="margin-top:0;">${titleText}</h2>
+        <p style="color:#a0aec0; margin-bottom:20px;">${bodyText}</p>
+        <button id="modal-close" style="padding:10px 25px; background:#538d4e; color:white; border:none; border-radius:6px; cursor:pointer; font-weight:bold;">Close</button>
+    `;
+    overlay.appendChild(card);
+    document.body.appendChild(overlay);
+
+    document.getElementById("modal-close").onclick = () => overlay.remove();
+    
+    // Add the CSS animation for the modal
+    const style = document.createElement('style');
+    style.innerHTML = `@keyframes modalPop { to { transform: scale(1); } }`;
+    document.head.appendChild(style);
+
+}
+
+async function fetchAndSubmitGuess(movieId, isManual = false) {
+    // 1. Fetch movie data for the guess
+    const res = await fetch(`https://api.themoviedb.org/3/movie/${movieId}?api_key=${API_KEY}&append_to_response=credits`);
+    const data = await res.json();
+    const director = data.credits?.crew?.find(m => m.job === "Director")?.name || "Unknown";
+    const releaseYear = parseInt(data.release_date?.split("-")[0]);
+    const genre = data.genres?.[0]?.name || "Unknown";
+
+    // 2. Logic: Compare against SECRET_MOVIE
+    const row = document.createElement("div");
+    row.classList.add("guess-row");
+    
+    const fields = [
+        { val: data.title, target: SECRET_MOVIE.title },
+        { val: releaseYear, target: SECRET_MOVIE.year },
+        { val: genre, target: SECRET_MOVIE.genre },
+        { val: director, target: SECRET_MOVIE.director }
+    ];
+
+    fields.forEach(f => {
+        const block = document.createElement("div");
+        block.classList.add("info-block");
+        block.innerText = f.val;
+        
+        // Match Logic
+        if (f.val === f.target) block.classList.add("correct");
+        else if (String(f.val).includes(String(f.target)) || String(f.target).includes(String(f.val))) block.classList.add("present");
+        else block.classList.add("absent");
+        
+        row.appendChild(block);
+    });
+
+    feed.prepend(row); // Show newest guess at the top
+    if (dropdown) dropdown.innerHTML = ""; // Clear searc
+    h
+}
+
+// Start the engine
+document.addEventListener("DOMContentLoaded", () => {
+    initGame();
+});
+
