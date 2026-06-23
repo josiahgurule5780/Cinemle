@@ -2,6 +2,7 @@
 const API_KEY = "a24cbba3b16a5ea825ec42ac4e4c8d52"; 
 let SECRET_MOVIE = null;
 let dailyMoviePool = []; 
+let CURRENT_DATE_SEED = 0;
 
 const searchInput = document.getElementById("movie-search");
 const dropdown = document.getElementById("dropdown-results");
@@ -49,13 +50,13 @@ function updateHintText(text) {
 async function setDailyMovie() {
     try {
         const today = new Date();
-        const dateSeed = today.getFullYear() * 10000 + (today.getMonth() + 1) * 100 + today.getDate();
+        CURRENT_DATE_SEED = today.getFullYear() * 10000 + (today.getMonth() + 1) * 100 + today.getDate();
         
-        const targetIndex = dateSeed % dailyMoviePool.length;
+        const targetIndex = CURRENT_DATE_SEED % dailyMoviePool.length;
         const basicMovieInfo = dailyMoviePool[targetIndex];
 
         await loadTargetDetails(basicMovieInfo.id);
-        loadSavedGuesses(dateSeed);
+        loadSavedGuesses(CURRENT_DATE_SEED);
 
     } catch (err) {
         console.error("Error setting daily movie:", err);
@@ -136,11 +137,25 @@ function launchDevPanel() {
     title.style.paddingBottom = "10px";
     overlay.appendChild(title);
 
+    // 1. POOL DIAGNOSTIC TRACKER
+    let diagnostics = document.createElement("div");
+    diagnostics.style = "background:#1a202c; padding:12px; border-radius:6px; border:1px solid #2d3748; margin:15px 0; font-size:14px; font-family:monospace; color:#a0aec0;";
+    let targetIndex = CURRENT_DATE_SEED % (dailyMoviePool.length || 1);
+    diagnostics.innerHTML = `
+        <strong>[DIAGNOSTICS]</strong><br>
+        • Total Loaded Pool: ${dailyMoviePool.length} movies<br>
+        • Current Date Seed: ${CURRENT_DATE_SEED}<br>
+        • Active Pool Index: ${targetIndex}
+    `;
+    overlay.appendChild(diagnostics);
+
+    // Metadata Display Container
     let infoBox = document.createElement("div");
     infoBox.id = "dev-info-box";
-    infoBox.style = "background:#222; padding:15px; border-radius:8px; margin:20px 0; font-size:16px; line-height:1.6; display:none;";
+    infoBox.style = "background:#222; padding:15px; border-radius:8px; margin:15px 0; font-size:16px; line-height:1.6; display:none;";
     overlay.appendChild(infoBox);
 
+    // Button: Toggle Movie Info
     let btnInfo = document.createElement("button");
     btnInfo.innerText = "👁️ Show / Hide Target Data";
     styleDevButton(btnInfo, "#4a5568");
@@ -160,6 +175,7 @@ function launchDevPanel() {
     };
     overlay.appendChild(btnInfo);
 
+    // Button: Re-roll / Change Movie Entirely
     let btnChange = document.createElement("button");
     btnChange.innerText = "🎲 Force Swap Target Movie (Random Re-roll)";
     styleDevButton(btnChange, "#e53e3e");
@@ -183,10 +199,74 @@ function launchDevPanel() {
     };
     overlay.appendChild(btnChange);
 
+    // 2. NEXT UP PREVIEW
+    let btnPreview = document.createElement("button");
+    btnPreview.innerText = "🔮 Next Up Preview (Tomorrow's Movie)";
+    styleDevButton(btnPreview, "#3182ce");
+    btnPreview.onclick = async () => {
+        if (dailyMoviePool.length === 0) return alert("Pool empty!");
+        const tomorrow = new Date();
+        tomorrow.setDate(tomorrow.getDate() + 1);
+        const tomorrowSeed = tomorrow.getFullYear() * 10000 + (tomorrow.getMonth() + 1) * 100 + tomorrow.getDate();
+        const tomorrowIndex = tomorrowSeed % dailyMoviePool.length;
+        const tomorrowMovie = dailyMoviePool[tomorrowIndex];
+
+        try {
+            let res = await fetch(`https://api.themoviedb.org/3/movie/${tomorrowMovie.id}?api_key=${API_KEY}`);
+            let d = await res.json();
+            alert(`🔮 TOMORROW'S TARGET SNEAK PEEK:\n\nTitle: ${d.title.toUpperCase()}\nRelease Year: ${d.release_date ? d.release_date.split("-")[0] : 'Unknown'}\nID: ${d.id}`);
+        } catch (e) {
+            alert("Error fetching tomorrow's data.");
+        }
+    };
+    overlay.appendChild(btnPreview);
+
+    // 3. AUTOCOMPLETE OVERRIDE BLOCK
+    let overrideContainer = document.createElement("div");
+    overrideContainer.style = "margin:15px 0; padding:12px; background:#1a202c; border-radius:6px; border:1px solid #2d3748;";
+    
+    let overrideLabel = document.createElement("label");
+    overrideLabel.innerText = "🎯 Force Inject Guess Row (By TMDB ID):";
+    overrideLabel.style = "display:block; font-size:13px; font-weight:bold; color:#cbd5e1; margin-bottom:6px;";
+    overrideContainer.appendChild(overrideLabel);
+
+    let overrideInput = document.createElement("input");
+    overrideInput.type = "number";
+    overrideInput.placeholder = "e.g., 272 (Batman Begins)";
+    overrideInput.style = "width:70%; padding:8px; border-radius:4px; border:1px solid #4a5568; background:#2d3748; color:#fff; font-size:14px; box-sizing:border-box;";
+    overrideContainer.appendChild(overrideInput);
+
+    let overrideBtn = document.createElement("button");
+    overrideBtn.innerText = "Inject";
+    overrideBtn.style = "width:26%; margin-left:4%; padding:8px; font-weight:bold; background:#4ade80; color:#0f172a; border:none; border-radius:4px; cursor:pointer;";
+    overrideBtn.onclick = async () => {
+        let idVal = overrideInput.value.trim();
+        if (!idVal) return alert("Enter a valid TMDB Movie ID number first!");
+        await fetchAndSubmitGuess(idVal, true);
+        overrideInput.value = "";
+        showCustomGameModal("Row Injected", `Movie ID ${idVal} has been processed onto the game board feed.`);
+    };
+    overrideContainer.appendChild(overrideBtn);
+    overlay.appendChild(overrideContainer);
+
+    // 4. RESET CACHE BUTTON
+    let btnResetCache = document.createElement("button");
+    btnResetCache.innerText = "🗑️ Hard Reset Cache (Clear Board History)";
+    styleDevButton(btnResetCache, "#d69e2e");
+    btnResetCache.onclick = () => {
+        if (confirm("Are you sure you want to clear your local guess history cache and refresh the game board?")) {
+            localStorage.removeItem("moviedle_guesses");
+            localStorage.removeItem("moviedle_date_seed");
+            window.location.reload();
+        }
+    };
+    overlay.appendChild(btnResetCache);
+
+    // Exit Dev Panel Button
     let btnClose = document.createElement("button");
     btnClose.innerText = "❌ Close Developer Suite";
     styleDevButton(btnClose, "#2d3748");
-    btnClose.style.marginTop = "40px";
+    btnClose.style.marginTop = "30px";
     btnClose.onclick = () => overlay.remove();
     overlay.appendChild(btnClose);
 
@@ -194,10 +274,10 @@ function launchDevPanel() {
 }
 
 function styleDevButton(btn, bgColor) {
-    btn.style = `display:block; width:100%; max-width:400px; background:${bgColor}; color:#fff; border:none; padding:14px; margin:12px 0; font-size:15px; font-weight:bold; border-radius:6px; cursor:pointer; text-align:left;`;
+    btn.style = `display:block; width:100%; max-width:400px; background:${bgColor}; color:#fff; border:none; padding:12px; margin:10px 0; font-size:14px; font-weight:bold; border-radius:6px; cursor:pointer; text-align:left;`;
 }
 
-// --- NEW CUSTOM NATIVE IN-GAME MODAL ELEMENT ---
+// --- CUSTOM NATIVE IN-GAME MODAL ELEMENT ---
 function showCustomGameModal(titleText, bodyText) {
     if (document.getElementById("custom-game-modal-overlay")) return;
 
@@ -227,7 +307,6 @@ function showCustomGameModal(titleText, bodyText) {
     overlay.appendChild(card);
     document.body.appendChild(overlay);
 
-    // Inject scaling animation into page dynamically
     if (!document.getElementById("modal-animation-style")) {
         let style = document.createElement("style");
         style.id = "modal-animation-style";
@@ -244,7 +323,7 @@ async function fetchAndSubmitGuess(movieId, saveToStorage = false) {
         let dir = d.credits?.crew?.find(m => m.job === "Director");
         
         submitGuess({
-            title: d.title.toUpperCase(),
+            title: d.title ? d.title.toUpperCase() : "UNKNOWN TITLE",
             year: parseInt(d.release_date?.split("-")[0]) || 0,
             genre: d.genres?.length > 0 ? d.genres[0].name : "Unknown",
             director: dir ? dir.name : "Unknown",
@@ -291,7 +370,6 @@ function submitGuess(guessedMovie) {
 
     feed.insertBefore(row, feed.firstChild);
 
-    // FIX: Replaced native alert window with native styling UI layout modal cards
     if (guessedMovie.title === SECRET_MOVIE.title) {
         setTimeout(() => {
             showCustomGameModal("🎉 Masterful Guessing!", "You found today's hidden movie! 🎬");
