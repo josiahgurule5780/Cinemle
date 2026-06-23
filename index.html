@@ -1,0 +1,28 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MovieLdle</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <header><h1>MOVIELDLE</h1></header>
+    
+    <!-- Hint Section -->
+    <div id="hint-box">
+        <p id="hint-text">Clue: Guess the movie!</p>
+    </div>
+
+    <!-- Search/Selection Input Box -->
+    <div id="search-container">
+        <input type="text" id="movie-search" placeholder="Search for a movie..." autocomplete="off">
+        <div id="dropdown-results"></div>
+    </div>
+
+    <!-- The Feed where guessed movies pile up infinitely -->
+    <div id="guesses-feed"></div>
+
+    <script src="script.js"></script>
+</body>
+</html>
