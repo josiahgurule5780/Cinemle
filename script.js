@@ -78,7 +78,10 @@ async function loadTargetDetails(movieId) {
         year: parseInt(details.release_date?.split("-")[0]) || 0,
         genre: mainGenre,
         director: directorObj ? directorObj.name : "Unknown",
-        poster: details.poster_path ? `https://image.tmdb.org/t/p/w200${details.poster_path}` : ""
+        poster: details.poster_path ? `https://image.tmdb.org/t/p/w200${details.poster_path}` : "",
+        overview: details.overview || "No description available.",
+        runtime: details.runtime || 0,
+        rating: details.vote_average ? details.vote_average.toFixed(1) : "N/A"
     };
 
     updateHintText(`Daily Hint: A popular ${SECRET_MOVIE.genre} movie released in ${SECRET_MOVIE.year}.`);
@@ -243,8 +246,8 @@ function launchDevPanel() {
                     row.innerHTML = `
                         <span><strong>${m.title} (${yr})</strong> - ID: ${m.id}</span>
                         <div>
-                            <button class="dev-set-tgt" data-id="${m.id}" style="background:#e53e3e; color:#fff; border:none; padding:4px 8px; font-size:11px; border-radius:3px; cursor:pointer; margin-right:5px;">Set Target</button>
-                            <button class="dev-inj-guess" data-id="${m.id}" style="background:#4ade80; color:#000; border:none; padding:4px 8px; font-size:11px; border-radius:3px; cursor:pointer;">Inject Guess</button>
+                            <button class="dev-set-tgt" data-id="${m.id}" style="background:#e53e3e; color:#fff; border:none; padding:4px 8px; font-size:11px; border-radius:3px; cursor:pointer; margin-right:4px;">Set</button>
+                            <button class="dev-inj-guess" data-id="${m.id}" style="background:#4ade80; color:#000; border:none; padding:4px 8px; font-size:11px; border-radius:3px; cursor:pointer;">Inj</button>
                         </div>
                     `;
                     dResults.appendChild(row);
@@ -278,7 +281,7 @@ function launchDevPanel() {
             <span>Genre:</span><input type="text" id="rig-genre" style="padding:6px; background:#2d3748; border:1px solid #4a5568; color:#fff; border-radius:4px;">
             <span>Director:</span><input type="text" id="rig-director" style="padding:6px; background:#2d3748; border:1px solid #4a5568; color:#fff; border-radius:4px;">
         </div>
-        <button id="btn-rig-apply" style="width:100%; margin-top:10px; padding:8px; background:#d69e2e; color:#fff; border:none; border-radius:4px; font-weight:bold; cursor:pointer;">Apply Attribute Rig overrides</button>
+        <button id="btn-rig-apply" style="width:100%; margin-top:10px; padding:8px; background:#d69e2e; color:#fff; border:none; border-radius:4px; font-weight:bold; cursor:pointer;">Apply Attribute Rig</button>
     `;
     overlay.appendChild(rigBlock);
 
@@ -379,20 +382,20 @@ function refreshInfoBox(box) {
     `;
 }
 function styleDevButton(btn, bgColor) {
-    btn.style = `display:block; width:100%; background:${bgColor}; color:#fff; border:none; padding:12px; margin:5px 0; font-size:14px; font-weight:bold; border-radius:6px; cursor:pointer; text-align:left;`;
+    btn.style = `display:block; width:100%; background:${bgColor}; color:#fff; border:none; padding:12px; margin:5px 0; font-size:14px; font-weight:bold; border-radius:6px; cursor:pointer; text-align:center;`;
 }
 function bknStyle(b) { b.style.flex = "1"; b.style.textAlign = "center"; }
 
-// --- CUSTOM NATIVE IN-GAME MODAL ELEMENT ---
-function showCustomGameModal(titleText, bodyText) {
+// --- CUSTOM NATIVE IN-GAME MODAL ELEMENT WITH ENHANCED WIN SCREEN ---
+function showCustomGameModal(titleText, bodyText, movieData = null) {
     if (document.getElementById("custom-game-modal-overlay")) return;
 
     let overlay = document.createElement("div");
     overlay.id = "custom-game-modal-overlay";
-    overlay.style = "position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.75); display:flex; align-items:center; justify-content:center; z-index:10000; padding:20px; box-sizing:border-box; font-family:sans-serif;";
+    overlay.style = "position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.75); display:flex; align-items:center; justify-content:center; z-index:10000; padding:20px; box-sizing:border-box; overflow-y:auto;";
 
     let card = document.createElement("div");
-    card.style = "background:#1e1e24; color:#ffffff; padding:30px; border-radius:16px; width:100%; max-width:420px; text-align:center; box-shadow:0 10px 25px rgba(0,0,0,0.5); border:1px solid #333; transform: scale(0.9); animation: modalPop 0.25s forwards cubic-bezier(0.175, 0.885, 0.32, 1.275);";
+    card.style = "background:#1e1e24; color:#ffffff; padding:30px; border-radius:16px; width:100%; max-width:600px; text-align:center; box-shadow:0 10px 25px rgba(0,0,0,0.5); border:1px solid #333; transform:scale(0.95); transition:transform 0.3s ease-out;";
 
     let headline = document.createElement("h2");
     headline.innerText = titleText;
@@ -404,20 +407,102 @@ function showCustomGameModal(titleText, bodyText) {
     message.style = "margin:0 0 25px 0; font-size:16px; color:#cbd5e1; line-height:1.5;";
     card.appendChild(message);
 
+    // Display movie details if it's a win screen
+    if (movieData) {
+        let detailsContainer = document.createElement("div");
+        detailsContainer.style = "background:#2d2d33; padding:20px; border-radius:10px; margin:20px 0; text-align:left; border:1px solid #3a3a3c;";
+
+        // Movie Title and Basic Info
+        let titleInfo = document.createElement("div");
+        titleInfo.style = "margin-bottom:15px;";
+        titleInfo.innerHTML = `
+            <h3 style="margin:0 0 8px 0; color:#4ade80; font-size:18px;">${movieData.title}</h3>
+            <p style="margin:0; color:#a0aec0; font-size:14px;">⭐ ${movieData.rating}/10 | ⏱️ ${movieData.runtime} min | 📅 ${movieData.year}</p>
+        `;
+        detailsContainer.appendChild(titleInfo);
+
+        // Movie Overview
+        let overviewLabel = document.createElement("p");
+        overviewLabel.style = "margin:12px 0 8px 0; font-weight:bold; color:#cbd5e1; font-size:14px;";
+        overviewLabel.innerText = "📝 Plot Summary";
+        detailsContainer.appendChild(overviewLabel);
+
+        let overview = document.createElement("p");
+        overview.style = "margin:0 0 15px 0; color:#a0aec0; font-size:13px; line-height:1.6; max-height:120px; overflow-y:auto;";
+        overview.innerText = movieData.overview;
+        detailsContainer.appendChild(overview);
+
+        // Where to Watch
+        if (movieData.watchProviders && movieData.watchProviders.length > 0) {
+            let watchLabel = document.createElement("p");
+            watchLabel.style = "margin:12px 0 8px 0; font-weight:bold; color:#cbd5e1; font-size:14px;";
+            watchLabel.innerText = "📺 Where to Watch";
+            detailsContainer.appendChild(watchLabel);
+
+            let watchContainer = document.createElement("div");
+            watchContainer.style = "display:flex; flex-wrap:wrap; gap:10px;";
+            
+            movieData.watchProviders.forEach(provider => {
+                let badge = document.createElement("span");
+                badge.style = "background:#4a5568; color:#fff; padding:6px 12px; border-radius:6px; font-size:12px; font-weight:bold;";
+                badge.innerText = provider;
+                watchContainer.appendChild(badge);
+            });
+            
+            detailsContainer.appendChild(watchContainer);
+        } else {
+            let noWatch = document.createElement("p");
+            noWatch.style = "margin:0; color:#a0aec0; font-size:13px;";
+            noWatch.innerText = "📺 Watch info not available in your region.";
+            detailsContainer.appendChild(noWatch);
+        }
+
+        card.appendChild(detailsContainer);
+    }
+
     let btn = document.createElement("button");
     btn.innerText = "OK";
     btn.style = "background:#4ade80; color:#0f172a; border:none; padding:12px 30px; font-size:16px; font-weight:bold; border-radius:8px; cursor:pointer; width:100%; transition: opacity 0.2s;";
+    btn.onmouseenter = () => btn.style.opacity = "0.8";
+    btn.onmouseleave = () => btn.style.opacity = "1";
     btn.onclick = () => overlay.remove();
     card.appendChild(btn);
 
     overlay.appendChild(card);
     document.body.appendChild(overlay);
 
+    // Animation
+    setTimeout(() => {
+        card.style.transform = "scale(1)";
+    }, 10);
+
     if (!document.getElementById("modal-animation-style")) {
         let style = document.createElement("style");
         style.id = "modal-animation-style";
         style.innerHTML = "@keyframes modalPop { to { transform: scale(1); } }";
         document.head.appendChild(style);
+    }
+}
+
+// Helper function to fetch watch providers for a movie
+async function getWatchProviders(movieId) {
+    try {
+        const res = await fetch(`https://api.themoviedb.org/3/movie/${movieId}/watch/providers?api_key=${API_KEY}`);
+        const data = await res.json();
+        
+        // Get US providers (you can adjust the region)
+        const usProviders = data.results?.US;
+        if (usProviders) {
+            let providers = [];
+            if (usProviders.buy) providers.push(...usProviders.buy.map(p => `Buy on ${p.provider_name}`));
+            if (usProviders.rent) providers.push(...usProviders.rent.map(p => `Rent on ${p.provider_name}`));
+            if (usProviders.flatrate) providers.push(...usProviders.flatrate.map(p => `Stream on ${p.provider_name}`));
+            return providers;
+        }
+        return [];
+    } catch (err) {
+        console.error("Error fetching watch providers:", err);
+        return [];
     }
 }
 
@@ -433,7 +518,11 @@ async function fetchAndSubmitGuess(movieId, saveToStorage = false) {
             year: parseInt(d.release_date?.split("-")[0]) || 0,
             genre: d.genres?.length > 0 ? d.genres[0].name : "Unknown",
             director: dir ? dir.name : "Unknown",
-            poster: d.poster_path ? `https://image.tmdb.org/t/p/w200${d.poster_path}` : ""
+            poster: d.poster_path ? `https://image.tmdb.org/t/p/w200${d.poster_path}` : "",
+            overview: d.overview || "No description available.",
+            runtime: d.runtime || 0,
+            rating: d.vote_average ? d.vote_average.toFixed(1) : "N/A",
+            id: d.id
         });
 
         if (saveToStorage) {
@@ -477,8 +566,16 @@ function submitGuess(guessedMovie) {
     feed.insertBefore(row, feed.firstChild);
 
     if (guessedMovie.title === SECRET_MOVIE.title) {
-        setTimeout(() => {
-            showCustomGameModal("🎉 Masterful Guessing!", "You found today's hidden movie! 🎬");
+        setTimeout(async () => {
+            const watchProviders = await getWatchProviders(guessedMovie.id);
+            showCustomGameModal("🎉 Masterful Guessing!", "You found today's hidden movie! 🎬", {
+                title: guessedMovie.title,
+                year: guessedMovie.year,
+                rating: guessedMovie.rating,
+                runtime: guessedMovie.runtime,
+                overview: guessedMovie.overview,
+                watchProviders: watchProviders
+            });
         }, 300);
     }
 }
