@@ -18,7 +18,8 @@ async function initGame() {
                 fetch(`https://api.themoviedb.org/3/discover/movie?api_key=${API_KEY}&language=en-US&sort_by=popularity.desc&vote_count.gte=300&page=${page}`)
                 .then(res => {
                     if (!res.ok) throw new Error("API Network response issue");
-                    return res.json())
+                    return res.json();
+                })
             );
         }
         
