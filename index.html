@@ -23,14 +23,8 @@
     <!-- The Feed where guessed movies pile up infinitely -->
     <div id="guesses-feed"></div>
 
-    <script>
-    // Automatically appends a unique timestamp to the script file name
-    // This tricks the browser into thinking it's a brand new file on EVERY refresh!
-    const script = document.createElement('script');
-    script.src = 'script.js?t=' + new Date().getTime();
-    document.head.appendChild(script);
-    </scr
-        ipt>
+ <script src="script.js?v=999" defer></script>
+
     
 </body>
 </html>
