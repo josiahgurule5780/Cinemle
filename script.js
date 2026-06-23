@@ -11,22 +11,19 @@ const feed = document.getElementById("guesses-feed");
 async function initGame() {
     try {
         let moviePromises = [];
-        // Fetching 3 pages (60 movies) to prevent network rate-limiting crashes
         for (let page = 1; page <= 3; page++) {
             moviePromises.push(
                 fetch(`https://api.themoviedb.org/3/discover/movie?api_key=${API_KEY}&language=en-US&sort_by=popularity.desc&vote_count.gte=50&page=${page}`)
                 .then(res => {
-                    if (!res.ok) return { results: [] }; // Gracefully handle a single page failure
+                    if (!res.ok) return { results: [] };
                     return res.json();
                 })
-                .catch(() => { return { results: [] }; }) // Catch network drops safely
+                .catch(() => { return { results: [] }; })
             );
         }
         
         let results = await Promise.all(moviePromises);
         dailyMoviePool = results.flatMap(data => data.results || []);
-
-        // Filter out any undefined or broken entries just in case
         dailyMoviePool = dailyMoviePool.filter(m => m && m.id);
 
         if (dailyMoviePool.length > 0) {
@@ -49,7 +46,6 @@ async function setDailyMovie() {
         const targetIndex = dateSeed % dailyMoviePool.length;
         const basicMovieInfo = dailyMoviePool[targetIndex];
 
-        // Request deep credits to uncover the Director's name using the movie ID
         const detailRes = await fetch(`https://api.themoviedb.org/3/movie/${basicMovieInfo.id}?api_key=${API_KEY}&append_to_response=credits`);
         const details = await detailRes.json();
 
@@ -65,10 +61,7 @@ async function setDailyMovie() {
             poster: details.poster_path ? `https://image.tmdb.org/t/p/w200${details.poster_path}` : ""
         };
 
-        // Clean hint system that completely protects the broad structure
         document.getElementById("hint-text").innerText = `Daily Hint: A popular ${SECRET_MOVIE.genre} movie released in ${SECRET_MOVIE.year}.`;
-        
-        // NEW: Load saved guesses from storage after the secret movie is officially loaded
         loadSavedGuesses(dateSeed);
 
     } catch (err) {
@@ -77,19 +70,29 @@ async function setDailyMovie() {
     }
 }
 
-// 4. Live Search Input Autocomplete querying TMDB's live global database directly
+// 4. Live Search Input Autocomplete & Hidden Dev Passcode Hook
 searchInput.addEventListener("input", async () => {
     let query = searchInput.value.trim();
+    
+    // --- SECRET DEV DOORMAN ---
+    // Change "DEVPANEL99" to whatever secret password you want!
+    if (query.toUpperCase() === "DEVPANEL99") {
+        searchInput.value = ""; // Clear out the input bar instantly so nobody sees it
+        dropdown.innerHTML = "";
+        
+        // Open up a simple dev diagnostic layout on screen
+        alert(`🛠️ DEV MODE ACTIVE 🛠️\nToday's Answer: ${SECRET_MOVIE.title}\nYear: ${SECRET_MOVIE.year}\nDirector: ${SECRET_MOVIE.director}`);
+        return; 
+    }
+
     dropdown.innerHTML = "";
     if (query.length < 2) return;
 
     try {
-        // Query TMDB directly for anything matching the input text globally
         let res = await fetch(`https://api.themoviedb.org/3/search/movie?api_key=${API_KEY}&language=en-US&query=${encodeURIComponent(query)}&page=1`);
         let data = await res.json();
         let searchResults = data.results || [];
 
-        // Filter out completely obscure things with no votes or no release date to keep search clean
         let filtered = searchResults.filter(m => m.release_date && m.vote_count >= 5).slice(0, 8);
         
         filtered.forEach(movie => {
@@ -98,7 +101,6 @@ searchInput.addEventListener("input", async () => {
             item.classList.add("dropdown-item");
             item.innerText = `${movie.title} (${movieYear})`;
             
-            // Pass the explicit movie ID directly to the guess loader
             item.addEventListener("click", () => fetchAndSubmitGuess(movie.id, true));
             dropdown.appendChild(item);
         });
@@ -108,7 +110,6 @@ searchInput.addEventListener("input", async () => {
 });
 
 // 5. Fetch complete details for the user's selected movie guess
-// Added "saveToStorage" flag so historical loads don't create infinite loop save events
 async function fetchAndSubmitGuess(movieId, saveToStorage = false) {
     try {
         let res = await fetch(`https://api.themoviedb.org/3/movie/${movieId}?api_key=${API_KEY}&append_to_response=credits`);
@@ -123,7 +124,6 @@ async function fetchAndSubmitGuess(movieId, saveToStorage = false) {
             poster: d.poster_path ? `https://image.tmdb.org/t/p/w200${d.poster_path}` : ""
         });
 
-        // NEW: If it's a live player interaction, track the movie ID in local memory
         if (saveToStorage) {
             saveGuessToStorage(movieId);
         }
@@ -140,7 +140,6 @@ function submitGuess(guessedMovie) {
     let row = document.createElement("div");
     row.classList.add("guess-row");
 
-    // Poster block
     let posterBlock = document.createElement("div");
     posterBlock.classList.add("poster-block");
     if (guessedMovie.poster) {
@@ -148,10 +147,8 @@ function submitGuess(guessedMovie) {
     }
     row.appendChild(posterBlock);
 
-    // Title Check
     row.appendChild(createInfoBlock(guessedMovie.title, guessedMovie.title === SECRET_MOVIE.title));
 
-    // Year Check with arrow indicators
     let yearStatus = "absent";
     let displayYear = guessedMovie.year;
     if (guessedMovie.year === SECRET_MOVIE.year) {
@@ -161,10 +158,7 @@ function submitGuess(guessedMovie) {
     }
     row.appendChild(createInfoBlock(displayYear, yearStatus));
 
-    // Genre Check
     row.appendChild(createInfoBlock(guessedMovie.genre, guessedMovie.genre === SECRET_MOVIE.genre));
-
-    // Director Check
     row.appendChild(createInfoBlock(guessedMovie.director, guessedMovie.director === SECRET_MOVIE.director));
 
     feed.insertBefore(row, feed.firstChild);
@@ -185,16 +179,13 @@ function createInfoBlock(text, statusClass) {
     return block;
 }
 
-// --- NEW STORAGE CACHING LOOPS ---
-
+// --- STORAGE CACHING LOOPS ---
 function saveGuessToStorage(movieId) {
     const today = new Date();
     const dateSeed = today.getFullYear() * 10000 + (today.getMonth() + 1) * 100 + today.getDate();
     
-    // Grab whatever historical guesses are stored for today
     let savedGuesses = JSON.parse(localStorage.getItem("moviedle_guesses")) || [];
     
-    // Prevent tracking duplicate entries if clicked multiple times
     if (!savedGuesses.includes(movieId)) {
         savedGuesses.push(movieId);
         localStorage.setItem("moviedle_guesses", JSON.stringify(savedGuesses));
@@ -205,7 +196,6 @@ function saveGuessToStorage(movieId) {
 async function loadSavedGuesses(currentDateSeed) {
     const storedDateSeed = localStorage.getItem("moviedle_date_seed");
     
-    // If the date in the cache doesn't match today's date seed, clear out the old storage completely
     if (storedDateSeed !== currentDateSeed.toString()) {
         localStorage.removeItem("moviedle_guesses");
         localStorage.removeItem("moviedle_date_seed");
@@ -213,13 +203,9 @@ async function loadSavedGuesses(currentDateSeed) {
     }
     
     let savedGuesses = JSON.parse(localStorage.getItem("moviedle_guesses")) || [];
-    
-    // Run through the cached IDs and inject them sequentially back onto the board
-    // We run them in sequence so they display in the correct chronological order
     for (const id of savedGuesses) {
         await fetchAndSubmitGuess(id, false);
     }
 }
 
-// Start the setup loop
 initGame();
