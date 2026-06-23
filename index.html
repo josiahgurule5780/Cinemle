@@ -23,8 +23,14 @@
     <!-- The Feed where guessed movies pile up infinitely -->
     <div id="guesses-feed"></div>
 
-    <!-- The "?v=1.0" tells the phone it's a brand new version, forcing it to ignore the old cache -->
-<script src="script.js?v=0.00002"></script>
+    <script>
+    // Automatically appends a unique timestamp to the script file name
+    // This tricks the browser into thinking it's a brand new file on EVERY refresh!
+    const script = document.createElement('script');
+    script.src = 'script.js?t=' + new Date().getTime();
+    document.head.appendChild(script);
+    </scr
+        ipt>
     
 </body>
 </html>
