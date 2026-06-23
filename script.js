@@ -122,14 +122,12 @@ if (searchInput) {
     });
 }
 
-// --- NEW VISUAL DEV PANEL ENGINE ---
+// --- VISUAL DEV PANEL ENGINE ---
 function launchDevPanel() {
-    // Prevent duplicate panels from opening
     if (document.getElementById("admin-dev-overlay")) return;
 
     let overlay = document.createElement("div");
     overlay.id = "admin-dev-overlay";
-    // Inline styling so it works instantly without touching your CSS file
     overlay.style = "position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(15,15,20,0.98); z-index:9999; color:#fff; font-family:sans-serif; padding:30px; box-sizing:border-box; overflow-y:auto;";
 
     let title = document.createElement("h2");
@@ -138,13 +136,11 @@ function launchDevPanel() {
     title.style.paddingBottom = "10px";
     overlay.appendChild(title);
 
-    // Metadata Display Container
     let infoBox = document.createElement("div");
     infoBox.id = "dev-info-box";
     infoBox.style = "background:#222; padding:15px; border-radius:8px; margin:20px 0; font-size:16px; line-height:1.6; display:none;";
     overlay.appendChild(infoBox);
 
-    // Button 1: Toggle Movie Info
     let btnInfo = document.createElement("button");
     btnInfo.innerText = "👁️ Show / Hide Target Data";
     styleDevButton(btnInfo, "#4a5568");
@@ -164,7 +160,6 @@ function launchDevPanel() {
     };
     overlay.appendChild(btnInfo);
 
-    // Button 2: Re-roll / Change Movie Entirely
     let btnChange = document.createElement("button");
     btnChange.innerText = "🎲 Force Swap Target Movie (Random Re-roll)";
     styleDevButton(btnChange, "#e53e3e");
@@ -184,11 +179,10 @@ function launchDevPanel() {
             <strong>TMDB ID:</strong> ${SECRET_MOVIE.id}
         `;
         btnChange.innerText = "🎲 Force Swap Target Movie (Random Re-roll)";
-        alert(`Target successfully updated to: ${SECRET_MOVIE.title}`);
+        showCustomGameModal("Target updated successfully!", `The new hidden answer is now locked into memory.`);
     };
     overlay.appendChild(btnChange);
 
-    // Button 3: Exit Dev Panel
     let btnClose = document.createElement("button");
     btnClose.innerText = "❌ Close Developer Suite";
     styleDevButton(btnClose, "#2d3748");
@@ -201,6 +195,45 @@ function launchDevPanel() {
 
 function styleDevButton(btn, bgColor) {
     btn.style = `display:block; width:100%; max-width:400px; background:${bgColor}; color:#fff; border:none; padding:14px; margin:12px 0; font-size:15px; font-weight:bold; border-radius:6px; cursor:pointer; text-align:left;`;
+}
+
+// --- NEW CUSTOM NATIVE IN-GAME MODAL ELEMENT ---
+function showCustomGameModal(titleText, bodyText) {
+    if (document.getElementById("custom-game-modal-overlay")) return;
+
+    let overlay = document.createElement("div");
+    overlay.id = "custom-game-modal-overlay";
+    overlay.style = "position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.75); display:flex; align-items:center; justify-content:center; z-index:10000; padding:20px; box-sizing:border-box; font-family:sans-serif;";
+
+    let card = document.createElement("div");
+    card.style = "background:#1e1e24; color:#ffffff; padding:30px; border-radius:16px; width:100%; max-width:420px; text-align:center; box-shadow:0 10px 25px rgba(0,0,0,0.5); border:1px solid #333; transform: scale(0.9); animation: modalPop 0.25s forwards cubic-bezier(0.175, 0.885, 0.32, 1.275);";
+
+    let headline = document.createElement("h2");
+    headline.innerText = titleText;
+    headline.style = "margin:0 0 15px 0; font-size:22px; color:#4ade80; font-weight:bold;";
+    card.appendChild(headline);
+
+    let message = document.createElement("p");
+    message.innerText = bodyText;
+    message.style = "margin:0 0 25px 0; font-size:16px; color:#cbd5e1; line-height:1.5;";
+    card.appendChild(message);
+
+    let btn = document.createElement("button");
+    btn.innerText = "OK";
+    btn.style = "background:#4ade80; color:#0f172a; border:none; padding:12px 30px; font-size:16px; font-weight:bold; border-radius:8px; cursor:pointer; width:100%; transition: opacity 0.2s;";
+    btn.onclick = () => overlay.remove();
+    card.appendChild(btn);
+
+    overlay.appendChild(card);
+    document.body.appendChild(overlay);
+
+    // Inject scaling animation into page dynamically
+    if (!document.getElementById("modal-animation-style")) {
+        let style = document.createElement("style");
+        style.id = "modal-animation-style";
+        style.innerHTML = "@keyframes modalPop { to { transform: scale(1); } }";
+        document.head.appendChild(style);
+    }
 }
 
 // 5. Fetch complete details for the user's selected movie guess
@@ -258,8 +291,11 @@ function submitGuess(guessedMovie) {
 
     feed.insertBefore(row, feed.firstChild);
 
+    // FIX: Replaced native alert window with native styling UI layout modal cards
     if (guessedMovie.title === SECRET_MOVIE.title) {
-        setTimeout(() => alert("Masterful guessing! You found today's hidden movie! 🎬🎉"), 200);
+        setTimeout(() => {
+            showCustomGameModal("🎉 Masterful Guessing!", "You found today's hidden movie! 🎬");
+        }, 300);
     }
 }
 
