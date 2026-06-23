@@ -7,15 +7,16 @@ const searchInput = document.getElementById("movie-search");
 const dropdown = document.getElementById("dropdown-results");
 const feed = document.getElementById("guesses-feed");
 
-// 2. Fetch a global list of highly popular movies on launch
+// 2. Fetch a massive list of both popular and indie/cult global movies for the Daily Target Picker
 async function initGame() {
     try {
         let moviePromises = [];
-        // Fetch top 5 pages of globally trending movies sorted by general popularity
-        // We require at least 300 votes so obscure/unheard of entries are completely ignored
-        for (let page = 1; page <= 5; page++) {
+        // Loops through 15 pages (300 movies) sorted by popularity.
+        // vote_count.gte=50 ensures we get real movies (including deep cuts/unpopular ones),
+        // while completely blocking obscure home-videos or unknown uploads!
+        for (let page = 1; page <= 15; page++) {
             moviePromises.push(
-                fetch(`https://api.themoviedb.org/3/discover/movie?api_key=${API_KEY}&language=en-US&sort_by=popularity.desc&vote_count.gte=300&page=${page}`)
+                fetch(`https://api.themoviedb.org/3/discover/movie?api_key=${API_KEY}&language=en-US&sort_by=popularity.desc&vote_count.gte=50&page=${page}`)
                 .then(res => {
                     if (!res.ok) throw new Error("API Network response issue");
                     return res.json();
@@ -24,9 +25,9 @@ async function initGame() {
         }
         
         let results = await Promise.all(moviePromises);
-        allGlobalMovies = results.flatMap(data => data.results || []);
+        dailyMoviePool = results.flatMap(data => data.results || []);
 
-        if (allGlobalMovies.length > 0) {
+        if (dailyMoviePool.length > 0) {
             await setDailyMovie();
         } else {
             document.getElementById("hint-text").innerText = "Error loading movie pool. Check API Key.";
@@ -36,6 +37,7 @@ async function initGame() {
         document.getElementById("hint-text").innerText = "Failed to load game data.";
     }
 }
+
 
 // 3. Mathematical Formula to pick one synchronized movie per calendar day
 async function setDailyMovie() {
