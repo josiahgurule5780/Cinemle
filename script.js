@@ -29,11 +29,19 @@ async function initGame() {
         if (dailyMoviePool.length > 0) {
             await setDailyMovie();
         } else {
-            document.getElementById("hint-text").innerText = "Error loading movie pool. Check your internet connection.";
+            updateHintText("Error loading movie pool. Check your internet connection.");
         }
     } catch (err) {
         console.error("Error loading movie library:", err);
-        document.getElementById("hint-text").innerText = "Failed to load game data.";
+        updateHintText("Failed to load game data.");
+    }
+}
+
+// Helper to update hint safely regardless of HTML element exact ID names
+function updateHintText(text) {
+    const hintElement = document.getElementById("hint-text") || document.querySelector('.hint-box') || document.querySelector('div blockquote');
+    if (hintElement) {
+        hintElement.innerText = text;
     }
 }
 
@@ -61,53 +69,52 @@ async function setDailyMovie() {
             poster: details.poster_path ? `https://image.tmdb.org/t/p/w200${details.poster_path}` : ""
         };
 
-        document.getElementById("hint-text").innerText = `Daily Hint: A popular ${SECRET_MOVIE.genre} movie released in ${SECRET_MOVIE.year}.`;
+        updateHintText(`Daily Hint: A popular ${SECRET_MOVIE.genre} movie released in ${SECRET_MOVIE.year}.`);
         loadSavedGuesses(dateSeed);
 
     } catch (err) {
         console.error("Error setting daily movie:", err);
-        document.getElementById("hint-text").innerText = "Failed to load game data.";
+        updateHintText("Failed to load game data.");
     }
 }
 
 // 4. Live Search Input Autocomplete & Hidden Dev Passcode Hook
-searchInput.addEventListener("input", async () => {
-    let query = searchInput.value.trim();
-    
-    // --- SECRET DEV DOORMAN ---
-    // Change "DEVPANEL99" to whatever secret password you want!
-    if (query.toUpperCase() === "DEVPANEL99") {
-        searchInput.value = ""; // Clear out the input bar instantly so nobody sees it
+if (searchInput) {
+    searchInput.addEventListener("input", async () => {
+        let query = searchInput.value.trim();
+        
+        if (query.toUpperCase() === "DEVPANEL99") {
+            searchInput.value = ""; 
+            if (dropdown) dropdown.innerHTML = "";
+            alert(`🛠️ DEV MODE ACTIVE 🛠️\nToday's Answer: ${SECRET_MOVIE.title}\nYear: ${SECRET_MOVIE.year}\nDirector: ${SECRET_MOVIE.director}`);
+            return; 
+        }
+
+        if (!dropdown) return;
         dropdown.innerHTML = "";
-        
-        // Open up a simple dev diagnostic layout on screen
-        alert(`🛠️ DEV MODE ACTIVE 🛠️\nToday's Answer: ${SECRET_MOVIE.title}\nYear: ${SECRET_MOVIE.year}\nDirector: ${SECRET_MOVIE.director}`);
-        return; 
-    }
+        if (query.length < 2) return;
 
-    dropdown.innerHTML = "";
-    if (query.length < 2) return;
+        try {
+            let res = await fetch(`https://api.themoviedb.org/3/search/movie?api_key=${API_KEY}&language=en-US&query=${encodeURIComponent(query)}&page=1`);
+            let data = await res.json();
+            let searchResults = data.results || [];
 
-    try {
-        let res = await fetch(`https://api.themoviedb.org/3/search/movie?api_key=${API_KEY}&language=en-US&query=${encodeURIComponent(query)}&page=1`);
-        let data = await res.json();
-        let searchResults = data.results || [];
-
-        let filtered = searchResults.filter(m => m.release_date && m.vote_count >= 5).slice(0, 8);
-        
-        filtered.forEach(movie => {
-            let movieYear = movie.release_date.split("-")[0];
-            let item = document.createElement("div");
-            item.classList.add("dropdown-item");
-            item.innerText = `${movie.title} (${movieYear})`;
+            let filtered = searchResults.filter(m => m.release_date && m.vote_count >= 5).slice(0, 8);
             
-            item.addEventListener("click", () => fetchAndSubmitGuess(movie.id, true));
-            dropdown.appendChild(item);
-        });
-    } catch (err) {
-        console.error("Live search request failed:", err);
-    }
-});
+            filtered.forEach(movie => {
+                let movieYear = movie.release_date.split("-")[0];
+                let item = document.createElement("div");
+                item.classList.add("dropdown-item");
+                item.innerText = `${movie.title} (${movieYear})`;
+                
+                item.addEventListener("click", () => fetchAndSubmitGuess(movie.id, true));
+                dropdown.appendChild(item);
+            });
+        } catch (err) {
+            console.error("Live search request failed:", err);
+        }
+    });
+}
 
 // 5. Fetch complete details for the user's selected movie guess
 async function fetchAndSubmitGuess(movieId, saveToStorage = false) {
@@ -134,8 +141,9 @@ async function fetchAndSubmitGuess(movieId, saveToStorage = false) {
 
 // 6. Build Result Comparison Rows
 function submitGuess(guessedMovie) {
-    searchInput.value = "";
-    dropdown.innerHTML = "";
+    if (searchInput) searchInput.value = "";
+    if (dropdown) dropdown.innerHTML = "";
+    if (!feed) return;
 
     let row = document.createElement("div");
     row.classList.add("guess-row");
@@ -208,4 +216,5 @@ async function loadSavedGuesses(currentDateSeed) {
     }
 }
 
+// Start up the execution loops safely
 initGame();
