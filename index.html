@@ -3,28 +3,223 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Movidle</title>
-    <link rel="stylesheet" href="style.css">
+    <title>Movidle - The Daily Movie Guessing Game</title>
+    <style>
+        :root {
+            --bg-color: #0f172a;
+            --card-bg: #1e1e24;
+            --border-color: #334155;
+            --text-color: #f8fafc;
+            --text-muted: #cbd5e1;
+            --correct-color: #4ade80;
+            --absent-color: #ef4444;
+        }
+
+        body {
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            margin: 0;
+            padding: 20px;
+            display: flex;
+            justify-content: center;
+        }
+
+        .game-container {
+            width: 100%;
+            max-width: 600px;
+            margin-top: 20px;
+        }
+
+        header {
+            text-align: center;
+            margin-bottom: 25px;
+        }
+
+        h1 {
+            margin: 0 0 10px 0;
+            font-size: 2.5rem;
+            letter-spacing: 2px;
+        }
+
+        blockquote {
+            background: var(--card-bg);
+            border-left: 4px solid #3182ce;
+            margin: 0 0 20px 0;
+            padding: 12px;
+            color: var(--text-muted);
+            font-style: italic;
+            border-radius: 0 8px 8px 0;
+        }
+
+        /* Mode Switcher Layout */
+        .mode-container {
+            text-align: center;
+            margin-bottom: 20px;
+            display: flex;
+            justify-content: center;
+        }
+
+        .mode-container button {
+            border: none;
+            padding: 10px 20px;
+            font-weight: bold;
+            font-size: 14px;
+            cursor: pointer;
+            transition: background 0.2s, color 0.2s;
+        }
+
+        #btn-mode-daily {
+            background: #4ade80;
+            color: #0f172a;
+            border-radius: 6px 0 0 6px;
+        }
+
+        #btn-mode-endless {
+            background: #2d3748;
+            color: #fff;
+            border-radius: 0 6px 6px 0;
+        }
+
+        /* Search & Dropdown System */
+        .search-box-container {
+            position: relative;
+            margin-bottom: 25px;
+        }
+
+        #movie-search {
+            width: 100%;
+            padding: 14px;
+            background-color: var(--card-bg);
+            border: 2px solid var(--border-color);
+            border-radius: 8px;
+            color: #fff;
+            font-size: 16px;
+            box-sizing: border-box;
+            outline: none;
+        }
+
+        #movie-search:focus {
+            border-color: #3182ce;
+        }
+
+        #dropdown-results {
+            position: absolute;
+            top: 100%;
+            left: 0;
+            width: 100%;
+            background-color: #1a1a24;
+            border: 1px solid var(--border-color);
+            border-top: none;
+            border-radius: 0 0 8px 8px;
+            z-index: 10;
+            max-height: 250px;
+            overflow-y: auto;
+            box-shadow: 0 8px 16px rgba(0,0,0,0.5);
+        }
+
+        .dropdown-item {
+            padding: 12px;
+            cursor: pointer;
+            border-bottom: 1px solid #2d3748;
+            font-size: 15px;
+        }
+
+        .dropdown-item:hover {
+            background-color: #2d3748;
+            color: #4ade80;
+        }
+
+        /* Guess Board Grid System */
+        #guesses-feed {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+            margin-top: 20px;
+        }
+
+        .guess-row {
+            display: grid;
+            grid-template-columns: 60px 2fr 1fr 1fr 2fr;
+            gap: 8px;
+            align-items: center;
+        }
+
+        .poster-block {
+            height: 75px;
+            background-color: #2d3748;
+            background-size: cover;
+            background-position: center;
+            border-radius: 6px;
+            border: 1px solid var(--border-color);
+        }
+
+        .info-block {
+            height: 75px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 8px;
+            box-sizing: border-box;
+            border-radius: 6px;
+            font-weight: bold;
+            font-size: 13px;
+            text-align: center;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            word-break: break-word;
+        }
+
+        .correct {
+            background-color: var(--correct-color);
+            color: #0f172a;
+        }
+
+        .absent {
+            background-color: var(--absent-color);
+            color: #fff;
+        }
+    </style>
 </head>
 <body>
-    <header><h1>MOVIDLE</h1></header>
-    
-    <!-- Hint Section -->
-    <div id="hint-box">
-        <p id="hint-text">Clue: Guess the movie!</p>
+
+    <div class="game-container">
+        <header>
+            <h1>🎬 MOVIDLE</h1>
+            <blockquote id="hint-text">Loading cinematic database...</blockquote>
+        </header>
+
+        <!-- Game Mode Switcher UI -->
+        <div class="mode-container">
+            <button id="btn-mode-daily">Daily Mode</button>
+            <button id="btn-mode-endless">Endless Mode</button>
+        </div>
+
+        <!-- Hidden Victory Reveal UI Panel -->
+        <div id="victory-reveal-panel" style="display: none; background: var(--card-bg); border: 2px solid var(--correct-color); border-radius: 12px; padding: 20px; margin-bottom: 25px; text-align: center;">
+            <h2 style="color: var(--correct-color); margin-top: 0; letter-spacing: 1px;">🎬 MISSION ACCOMPLISHED!</h2>
+            <div style="display: flex; gap: 20px; justify-content: center; align-items: center; max-width: 400px; margin: 0 auto; text-align: left;">
+                <img id="reveal-poster" src="" style="width: 90px; border-radius: 6px; box-shadow: 0 4px 12px rgba(0,0,0,0.6); border: 1px solid #475569;">
+                <div>
+                    <h3 id="reveal-title" style="margin: 0 0 6px 0; color: #fff; font-size: 18px;"></h3>
+                    <p id="reveal-meta" style="margin: 0; color: var(--text-muted); font-size: 14px; line-height: 1.5;"></p>
+                </div>
+            </div>
+            <hr style="border: 0; border-top: 1px solid var(--border-color); margin: 15px 0;">
+            <button id="btn-share-score" style="background: #3182ce; color: #fff; border: none; padding: 12px 24px; font-weight: bold; font-size: 15px; border-radius: 6px; cursor: pointer; width: 100%; max-width: 260px; transition: background 0.2s;">📋 Share Score</button>
+        </div>
+
+        <!-- Live Search Auto-complete input -->
+        <div class="search-box-container">
+            <input type="text" id="movie-search" placeholder="Type a movie title..." autocomplete="off">
+            <div id="dropdown-results"></div>
+        </div>
+
+        <!-- Dynamic Guess Evaluation Board -->
+        <div id="guesses-feed"></div>
     </div>
 
-    <!-- Search/Selection Input Box -->
-    <div id="search-container">
-        <input type="text" id="movie-search" placeholder="Search for a movie..." autocomplete="off">
-        <div id="dropdown-results"></div>
-    </div>
-
-    <!-- The Feed where guessed movies pile up infinitely -->
-    <div id="guesses-feed"></div>
-
-  <script src="script.js?v=0.8" defer></script>
-
-    
+    <!-- Main Game Logic Runtime Block Loop (Cache-Busted v5.0) -->
+    <script src="script.js?v=5.0" defer></script>
 </body>
 </html>
