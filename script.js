@@ -100,47 +100,6 @@ if (endlessBtn) {
     });
 }
 
-// Automatically censors title giveaways, proper nouns, and character names from the plot summary
-function generateAutomatedHint(movieObj) {
-    let hint = movieObj.overview;
-    if (!hint || hint === "No description available.") return "No plot outline provided.";
-
-    // 1. First, aggressively redact any words present in the movie title
-    const titleWords = movieObj.title.split(/[\s\-\:\'\,\.]+/);
-    const stopWords = ["THE", "A", "AN", "OF", "AND", "IN", "TO", "FOR", "WITH", "ON", "AT", "BY", "FROM", "IS"];
-
-    titleWords.forEach(word => {
-        if (word.length > 1 && !stopWords.includes(word.toUpperCase())) {
-            const regex = new RegExp(`\\b${word}\\b`, 'gi');
-            hint = hint.replace(regex, "█████");
-        }
-    });
-
-    // 2. AGGRESSIVE REDACTION: Censor all remaining proper nouns / capitalized names
-    // This regex looks for capitalized words that don't start a sentence, 
-    // or consecutive capitalized words (like character names: Woody, Buzz Lightyear, Bonnie)
-    hint = hint.replace(/\b[A-Z][a-z]+(?:\s+[A-Z][a-z]+)*\b/g, (match, offset) => {
-        // Allow the very first word of the hint to remain unredacted if it's normal prose
-        if (offset === 0) return match;
-        
-        // Check if the preceding character suggests it's just starting a new sentence
-        const precedingText = hint.slice(0, offset).trim();
-        if (precedingText.endsWith('.') || precedingText.endsWith('!') || precedingText.endsWith('?')) {
-            return match; // Keep sentence starters
-        }
-        
-        // Otherwise, it's likely a character name, location, or actor name -> CENSOR IT
-        return "█████";
-    });
-
-    // 3. Limit the length so it stays punchy and cryptic
-    if (hint.length > 130) {
-        hint = hint.substring(0, 130) + "...";
-    }
-
-    return hint;
-}
-
 // Helper to pull complete target details from TMDB
 async function loadTargetDetails(movieId) {
     const detailRes = await fetch(`https://api.themoviedb.org/3/movie/${movieId}?api_key=${API_KEY}&append_to_response=credits`);
@@ -162,8 +121,7 @@ async function loadTargetDetails(movieId) {
     };
 
     const modePrefix = IS_ENDLESS ? "Endless Challenge" : "Daily Hint";
-    const crypticPlot = generateAutomatedHint(SECRET_MOVIE);
-    updateHintText(`${modePrefix}: A popular ${SECRET_MOVIE.genre} movie released in ${SECRET_MOVIE.year} — "${crypticPlot}"`);
+    updateHintText(`${modePrefix}: A popular ${SECRET_MOVIE.genre} movie released in ${SECRET_MOVIE.year}.`);
 }
 
 // 4. Live Search Input Autocomplete & Hidden Dev Passcode Hook
@@ -367,8 +325,7 @@ function launchDevPanel() {
             SECRET_MOVIE.genre = document.getElementById("rig-genre").value;
             SECRET_MOVIE.director = document.getElementById("rig-director").value;
             refreshInfoBox(infoBox);
-            const crypticPlot = generateAutomatedHint(SECRET_MOVIE);
-            updateHintText(`Daily Hint: A popular ${SECRET_MOVIE.genre} movie released in ${SECRET_MOVIE.year} — "${crypticPlot}"`);
+            updateHintText(`Daily Hint: A popular ${SECRET_MOVIE.genre} movie released in ${SECRET_MOVIE.year}.`);
             alert("Core match variables rigged successfully!");
         };
     }, 50);
@@ -401,7 +358,7 @@ function launchDevPanel() {
             alert(`Engine shifted to Date Seed: ${CURRENT_DATE_SEED}`);
         };
     }, 50);
-    
+
     let statsBlock = document.createElement("div");
     statsBlock.style = "margin:15px 0; padding:15px; background:#1a202c; border-radius:8px; border:1px solid #2d3748; max-width:500px; display:flex; gap:10px;";
     
@@ -525,12 +482,14 @@ function showCustomGameModal(titleText, bodyText, movieData = null) {
     }
 
     let btn = document.createElement("button");
+    // If endless, button says "Play Next Movie", otherwise standard "OK"
     btn.innerText = IS_ENDLESS ? "Play Next Movie 🎬" : "OK";
     btn.style = "background:#4ade80; color:#0f172a; border:none; padding:12px 30px; font-size:16px; font-weight:bold; border-radius:8px; cursor:pointer; width:100%; transition: opacity 0.2s;";
     btn.onmouseenter = () => btn.style.opacity = "0.8";
     btn.onmouseleave = () => btn.style.opacity = "1";
     btn.onclick = () => {
         overlay.remove();
+        // If endless, instantly load another hidden mystery film!
         if (IS_ENDLESS) {
             setEndlessMovie();
         }
@@ -663,6 +622,7 @@ function createInfoBlock(text, statusClass) {
 
 // --- STORAGE CACHING LOOPS ---
 function saveGuessToStorage(movieId) {
+    // Prevent daily local history caching if in Endless Mode
     if (IS_ENDLESS) return; 
 
     let savedGuesses = JSON.parse(localStorage.getItem("moviedle_guesses")) || [];
