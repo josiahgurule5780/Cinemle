@@ -100,26 +100,42 @@ if (endlessBtn) {
     });
 }
 
-// Automatically censors obvious giveaways from the movie plot summary
+// Automatically censors title giveaways, proper nouns, and character names from the plot summary
 function generateAutomatedHint(movieObj) {
     let hint = movieObj.overview;
     if (!hint || hint === "No description available.") return "No plot outline provided.";
 
-    // 1. Break the title into individual keywords (e.g., "The Matrix" -> ["THE", "MATRIX"])
+    // 1. First, aggressively redact any words present in the movie title
     const titleWords = movieObj.title.split(/[\s\-\:\'\,\.]+/);
-    const stopWords = ["THE", "A", "AN", "OF", "AND", "IN", "TO", "FOR", "WITH", "ON", "AT", "BY"];
+    const stopWords = ["THE", "A", "AN", "OF", "AND", "IN", "TO", "FOR", "WITH", "ON", "AT", "BY", "FROM", "IS"];
 
     titleWords.forEach(word => {
         if (word.length > 1 && !stopWords.includes(word.toUpperCase())) {
-            // Create a case-insensitive regular expression to replace the word with redaction blocks
             const regex = new RegExp(`\\b${word}\\b`, 'gi');
             hint = hint.replace(regex, "█████");
         }
     });
 
-    // 2. Limit the length so it stays punchy and doesn't give away too much detail
-    if (hint.length > 150) {
-        hint = hint.substring(0, 150) + "...";
+    // 2. AGGRESSIVE REDACTION: Censor all remaining proper nouns / capitalized names
+    // This regex looks for capitalized words that don't start a sentence, 
+    // or consecutive capitalized words (like character names: Woody, Buzz Lightyear, Bonnie)
+    hint = hint.replace(/\b[A-Z][a-z]+(?:\s+[A-Z][a-z]+)*\b/g, (match, offset) => {
+        // Allow the very first word of the hint to remain unredacted if it's normal prose
+        if (offset === 0) return match;
+        
+        // Check if the preceding character suggests it's just starting a new sentence
+        const precedingText = hint.slice(0, offset).trim();
+        if (precedingText.endsWith('.') || precedingText.endsWith('!') || precedingText.endsWith('?')) {
+            return match; // Keep sentence starters
+        }
+        
+        // Otherwise, it's likely a character name, location, or actor name -> CENSOR IT
+        return "█████";
+    });
+
+    // 3. Limit the length so it stays punchy and cryptic
+    if (hint.length > 130) {
+        hint = hint.substring(0, 130) + "...";
     }
 
     return hint;
