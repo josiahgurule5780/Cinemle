@@ -19,30 +19,49 @@ body {
     text-align: center;
 }
 #Endless {
+  /* Positioning: Pins it to the top-right corner with some breathing room */
+  position: fixed;
+  top: 20px;
+  right: 20px;
+  z-index: 1000; /* Ensures it stays above the search dropdown and guess feeds */
+
   /* Colors and Typography */
-  background-color: #008000;      /* Bright green background */
-  color: #ffffff;                  /* White text color */
-  font-size: 16px;                 /* Readable text size */
+  background-color: #2ecc71;       /* Vibrant, modern green background */
+  color: #121213;                  /* Dark text color for high contrast against green */
+  font-size: 18px;                 /* Bigger text size */
+  font-weight: bold;               /* Bold text to stand out */
   font-family: sans-serif;         /* Clean font style */
   
   /* Sizing and Spacing */
-  padding: 12px 24px;              /* Internal spacing (12px top/bottom, 24px sides) */
-  border: none;                    /* Removes the ugly default browser border */
-  border-radius: 6px;              /* Rounds the corners smoothly */
+  padding: 14px 28px;              /* Generous spacing making the button physically bigger */
+  border: none;                    /* Removes default browser border */
+  border-radius: 8px;              /* Smooth, modern rounded corners */
+  box-shadow: 0 4px 12px rgba(46, 204, 113, 0.3); /* Soft green glow glow for prominence */
   
   /* Interactivity */
   cursor: pointer;                 /* Changes mouse to a hand icon on hover */
-  transition: background 0.3s ease;/* Animates color changes smoothly */
+  transition: all 0.2s ease;       /* Animates hover transformations smoothly */
 }
 
-/* Hover Effect: Changes color when user moves mouse over it */
-.custom-btn:hover {
-  background-color: #2980b9;      /* Darker blue on hover */
+/* Hover Effect: Changes color and slightly enlarges when mouse moves over it */
+#Endless:hover {
+  background-color: #27ae60;       /* Darker green on hover */
+  transform: scale(1.05);          /* Slightly bigger on hover */
 }
 
-/* Click Effect: Briefly shifts downwards when clicked */
-.custom-btn:active {
-  transform: translateY(1px);     /* Simulates a physical button press */
+/* Click Effect: Brief press down when clicked */
+#Endless:active {
+  transform: scale(0.98);          /* Simulates a physical button press depth */
+}
+
+/* Responsive adjustment for mobile screens so it doesn't overlap headers */
+@media (max-width: 600px) {
+  #Endless {
+    position: static;              /* Drops back into normal flow on tiny screens */
+    margin-bottom: 20px;
+    width: 100%;                   /* Takes full width on mobile for easier tapping */
+    box-sizing: border-box;
+  }
 }
 
 
