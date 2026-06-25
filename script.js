@@ -10,6 +10,8 @@ const dropdown = document.getElementById("dropdown-results");
 const feed = document.getElementById("guesses-feed");
 const endlessBtn = document.getElementById("endless-btn");
 
+let aiSummarizerModel = null;
+
 // 2. Fetch a global list of movies safely for the Daily Target Picker
 async function initGame() {
     try {
@@ -100,45 +102,61 @@ if (endlessBtn) {
     });
 }
 
-// Automatically censors title giveaways, proper nouns, and character names from the plot summary
-function generateAutomatedHint(movieObj) {
-    let hint = movieObj.overview;
-    if (!hint || hint === "No description available.") return "No plot outline provided.";
-
-    // 1. First, aggressively redact any words present in the movie title
-    const titleWords = movieObj.title.split(/[\s\-\:\'\,\.]+/);
-    const stopWords = ["THE", "A", "AN", "OF", "AND", "IN", "TO", "FOR", "WITH", "ON", "AT", "BY", "FROM", "IS"];
-
-    titleWords.forEach(word => {
-        if (word.length > 1 && !stopWords.includes(word.toUpperCase())) {
-            const regex = new RegExp(`\\b${word}\\b`, 'gi');
-            hint = hint.replace(regex, "█████");
+// ACTUAL ON-DEVICE AI ENGINE: Rewrites texts abstractly without structural giveaways
+async function generateAutomatedHint(movieObj) {
+    try {
+        // Initialize the local web AI model pipeline if not already loaded
+        if (!aiSummarizerModel) {
+            updateHintText("AI Engine is initializing clue generation...");
+            if (window.AI_Pipeline) {
+                aiSummarizerModel = await window.AI_Pipeline('summarization', 'Xenova/distilbart-cnn-6-6');
+            } else {
+                return "AI system offline. Fallback: A popular " + movieObj.genre + " movie.";
+            }
         }
-    });
 
-    // 2. AGGRESSIVE REDACTION: Censor all remaining proper nouns / capitalized names
-    // This regex looks for capitalized words that don't start a sentence, 
-    // or consecutive capitalized words (like character names: Woody, Buzz Lightyear, Bonnie)
-    hint = hint.replace(/\b[A-Z][a-z]+(?:\s+[A-Z][a-z]+)*\b/g, (match, offset) => {
-        // Allow the very first word of the hint to remain unredacted if it's normal prose
-        if (offset === 0) return match;
+        updateHintText("AI is analyzing plot layers...");
+
+        let rawOverview = movieObj.overview || "";
+        const titleWords = movieObj.title.split(/[\s\-\:\'\,\.]+/);
         
-        // Check if the preceding character suggests it's just starting a new sentence
-        const precedingText = hint.slice(0, offset).trim();
-        if (precedingText.endsWith('.') || precedingText.endsWith('!') || precedingText.endsWith('?')) {
-            return match; // Keep sentence starters
+        // Mask obvious title occurrences before sending to AI to minimize copy-paste behaviors
+        titleWords.forEach(word => {
+            if (word.length > 2) {
+                const regex = new RegExp(`\\b${word}\\b`, 'gi');
+                rawOverview = rawOverview.replace(regex, "[THE PROTAGONIST]");
+            }
+        });
+
+        // Prompt the locally hosted model layout for abstract token sequences
+        const aiOutput = await aiSummarizerModel(rawOverview, {
+            max_length: 35,
+            min_length: 10,
+            do_sample: false
+        });
+
+        let aiHint = aiOutput[0].summary_text;
+
+        // Safety Net: Hard clean loop over the generated text to scrub actor/character leakages
+        if (movieObj.blacklist) {
+            movieObj.blacklist.forEach(badWord => {
+                const regex = new RegExp(`\\b${badWord}\\b`, 'gi');
+                aiHint = aiHint.replace(regex, "████");
+            });
         }
-        
-        // Otherwise, it's likely a character name, location, or actor name -> CENSOR IT
-        return "█████";
-    });
+        titleWords.forEach(word => {
+            if (word.length > 1) {
+                const regex = new RegExp(`\\b${word}\\b`, 'gi');
+                aiHint = aiHint.replace(regex, "████");
+            }
+        });
 
-    // 3. Limit the length so it stays punchy and cryptic
-    if (hint.length > 130) {
-        hint = hint.substring(0, 130) + "...";
+        return aiHint.trim();
+
+    } catch (err) {
+        console.error("Browser AI engine encountered an error:", err);
+        return "A " + movieObj.genre + " film tracking complex conflicts, released in " + movieObj.year + ".";
     }
-
-    return hint;
 }
 
 // Helper to pull complete target details from TMDB
@@ -149,6 +167,15 @@ async function loadTargetDetails(movieId) {
     const directorObj = details.credits?.crew?.find(member => member.job === "Director");
     const mainGenre = details.genres?.length > 0 ? details.genres[0].name : "Unknown";
 
+    // Gather specific character name keywords to pass to the AI cleaning phase
+    const spoilerKeywords = new Set();
+    if (details.credits && details.credits.cast) {
+        details.credits.cast.slice(0, 12).forEach(m => {
+            if (m.name) m.name.split(" ").forEach(w => spoilerKeywords.add(w.toUpperCase()));
+            if (m.character) m.character.split(" ").forEach(w => spoilerKeywords.add(w.toUpperCase()));
+        });
+    }
+
     SECRET_MOVIE = {
         id: details.id,
         title: details.title.toUpperCase(),
@@ -158,11 +185,15 @@ async function loadTargetDetails(movieId) {
         poster: details.poster_path ? `https://image.tmdb.org/t/p/w200${details.poster_path}` : "",
         overview: details.overview || "No description available.",
         runtime: details.runtime || 0,
-        rating: details.vote_average ? details.vote_average.toFixed(1) : "N/A"
+        rating: details.vote_average ? details.vote_average.toFixed(1) : "N/A",
+        blacklist: Array.from(spoilerKeywords).filter(w => w.length > 2)
     };
 
     const modePrefix = IS_ENDLESS ? "Endless Challenge" : "Daily Hint";
-    const crypticPlot = generateAutomatedHint(SECRET_MOVIE);
+    
+    // Process via the asynchronous machine learning execution engine
+    const crypticPlot = await generateAutomatedHint(SECRET_MOVIE);
+    
     updateHintText(`${modePrefix}: A popular ${SECRET_MOVIE.genre} movie released in ${SECRET_MOVIE.year} — "${crypticPlot}"`);
 }
 
@@ -361,13 +392,13 @@ function launchDevPanel() {
         document.getElementById("rig-genre").value = SECRET_MOVIE.genre;
         document.getElementById("rig-director").value = SECRET_MOVIE.director;
 
-        document.getElementById("btn-rig-apply").onclick = () => {
+        document.getElementById("btn-rig-apply").onclick = async () => {
             SECRET_MOVIE.title = document.getElementById("rig-title").value.toUpperCase();
             SECRET_MOVIE.year = parseInt(document.getElementById("rig-year").value) || 0;
             SECRET_MOVIE.genre = document.getElementById("rig-genre").value;
             SECRET_MOVIE.director = document.getElementById("rig-director").value;
             refreshInfoBox(infoBox);
-            const crypticPlot = generateAutomatedHint(SECRET_MOVIE);
+            const crypticPlot = await generateAutomatedHint(SECRET_MOVIE);
             updateHintText(`Daily Hint: A popular ${SECRET_MOVIE.genre} movie released in ${SECRET_MOVIE.year} — "${crypticPlot}"`);
             alert("Core match variables rigged successfully!");
         };
@@ -612,7 +643,7 @@ function submitGuess(guessedMovie) {
     let posterBlock = document.createElement("div");
     posterBlock.classList.add("poster-block");
     if (guessedMovie.poster) {
-        posterBlock.style.backgroundImage = `url('${guessedMovie.poster}')`;
+        guessedMovie.poster.style.backgroundImage = `url('${guessedMovie.poster}')`;
     }
     row.appendChild(posterBlock);
 
