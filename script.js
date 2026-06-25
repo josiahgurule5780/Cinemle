@@ -4,6 +4,7 @@ let SECRET_MOVIE = null;
 let dailyMoviePool = []; 
 let CURRENT_DATE_SEED = 0;
 let IS_ENDLESS = false; // Tracks if the player is in endless mode
+let guessCount = 0; // Tracks number of incorrect guesses for hints
 
 const searchInput = document.getElementById("movie-search");
 const dropdown = document.getElementById("dropdown-results");
@@ -48,10 +49,25 @@ function updateHintText(text) {
     }
 }
 
+// NEW: Progressive Hint Logic
+function triggerProgressiveHint() {
+    guessCount++;
+    const mode = IS_ENDLESS ? "Endless" : "Daily";
+    
+    // Reveal hints based on incorrect guess count
+    switch(guessCount) {
+        case 1: updateHintText(`${mode} Hint: Directed by ${SECRET_MOVIE.director}.`); break;
+        case 2: updateHintText(`${mode} Hint: The movie runtime is ${SECRET_MOVIE.runtime} minutes.`); break;
+        case 3: updateHintText(`${mode} Hint: Plot: ${SECRET_MOVIE.overview.substring(0, 80)}...`); break;
+        default: break;
+    }
+}
+
 // 3. Mathematical Formula to pick one synchronized movie per calendar day (UTC Fixed)
 async function setDailyMovie(customDate = null) {
     try {
         IS_ENDLESS = false;
+        guessCount = 0; // Reset counter on new game
         if (endlessBtn) endlessBtn.innerText = "Endless Mode 🎲";
         
         const today = customDate || new Date();
@@ -74,6 +90,7 @@ async function setEndlessMovie() {
     if (dailyMoviePool.length === 0) return;
     
     IS_ENDLESS = true;
+    guessCount = 0; // Reset counter for new endless round
     if (endlessBtn) endlessBtn.innerText = "Back to Daily Mode 📅";
     
     // Clear existing layout feed
@@ -120,6 +137,7 @@ async function loadTargetDetails(movieId) {
         rating: details.vote_average ? details.vote_average.toFixed(1) : "N/A"
     };
 
+    guessCount = 0; // Reset hint progression
     const modePrefix = IS_ENDLESS ? "Endless Challenge" : "Daily Hint";
     updateHintText(`${modePrefix}: A popular ${SECRET_MOVIE.genre} movie released in ${SECRET_MOVIE.year}.`);
 }
@@ -482,14 +500,12 @@ function showCustomGameModal(titleText, bodyText, movieData = null) {
     }
 
     let btn = document.createElement("button");
-    // If endless, button says "Play Next Movie", otherwise standard "OK"
     btn.innerText = IS_ENDLESS ? "Play Next Movie 🎬" : "OK";
     btn.style = "background:#4ade80; color:#0f172a; border:none; padding:12px 30px; font-size:16px; font-weight:bold; border-radius:8px; cursor:pointer; width:100%; transition: opacity 0.2s;";
     btn.onmouseenter = () => btn.style.opacity = "0.8";
     btn.onmouseleave = () => btn.style.opacity = "1";
     btn.onclick = () => {
         overlay.remove();
-        // If endless, instantly load another hidden mystery film!
         if (IS_ENDLESS) {
             setEndlessMovie();
         }
@@ -606,6 +622,8 @@ function submitGuess(guessedMovie) {
                 watchProviders: watchProviders
             });
         }, 300);
+    } else {
+        triggerProgressiveHint();
     }
 }
 
@@ -622,7 +640,6 @@ function createInfoBlock(text, statusClass) {
 
 // --- STORAGE CACHING LOOPS ---
 function saveGuessToStorage(movieId) {
-    // Prevent daily local history caching if in Endless Mode
     if (IS_ENDLESS) return; 
 
     let savedGuesses = JSON.parse(localStorage.getItem("moviedle_guesses")) || [];
